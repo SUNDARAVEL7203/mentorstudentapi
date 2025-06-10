@@ -8,6 +8,7 @@ dotenv.config();
 const app = express();
 app.use(express.json());
 
+   connectDB();
 app.get("/", (req, res) => {
     return res.status(200).json({
         message: "I am from backend server",
@@ -21,6 +22,6 @@ app.get("/", (req, res) => {
 app.use('/api/students', studentRoutes);
 
 app.listen(PORT, () => {
-    connectDB();
+ 
     console.log(`Server is running on port ${PORT}`);
 });
