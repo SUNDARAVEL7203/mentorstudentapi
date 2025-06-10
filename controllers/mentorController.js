@@ -1,33 +1,57 @@
 import { Student } from "../models/studentModel.js";
 import { Mentor } from "../models/mentorModel.js";
 
-
+// ✅ Create a new mentor
 export const createMentor = async (req, res) => {
-  const { name } = req.body;
-  const mentor = new Mentor({ name });
-  await mentor.save();
-  res.status(201).json(mentor);
+  try {
+    const { name } = req.body;
+    if (!name) return res.status(400).json({ error: "Mentor name is required" });
+
+    const mentor = new Mentor({ name });
+    await mentor.save();
+    res.status(201).json(mentor);
+  } catch (err) {
+    res.status(500).json({ error: "Server error while creating mentor" });
+  }
 };
 
+// ✅ Assign multiple students to a mentor
 export const assignStudentsToMentor = async (req, res) => {
-  const { mentorId, studentIds } = req.body;
-  const mentor = await Mentor.findById(mentorId);
-  const students = await Student.find({ _id: { $in: studentIds }, currentMentor: null });
+  try {
+    const { mentorId, studentIds } = req.body;
 
-  students.forEach(student => {
-    student.currentMentor = mentorId;
-    student.previousMentors.push(mentorId);
-  });
+    if (!mentorId || !Array.isArray(studentIds)) {
+      return res.status(400).json({ error: "mentorId and studentIds[] are required" });
+    }
 
-  await Promise.all(students.map(s => s.save()));
+    const mentor = await Mentor.findById(mentorId);
+    if (!mentor) return res.status(404).json({ error: "Mentor not found" });
 
-  mentor.students.push(...studentIds);
-  await mentor.save();
+    const students = await Student.find({ _id: { $in: studentIds }, currentMentor: null });
 
-  res.json({ message: "Students assigned", mentor });
+    for (const student of students) {
+      student.currentMentor = mentorId;
+      student.previousMentors.addToSet(mentorId);
+      await student.save();
+    }
+
+    mentor.students.push(...students.map(s => s._id));
+    await mentor.save();
+
+    res.json({ message: "Students assigned", assignedStudents: students });
+  } catch (err) {
+    res.status(500).json({ error: "Server error while assigning students" });
+  }
 };
 
+// ✅ Get all students for a mentor
 export const getStudentsForMentor = async (req, res) => {
-  const mentor = await Mentor.findById(req.params.id).populate('students');
-  res.json(mentor.students);
+  try {
+    const mentor = await Mentor.findById(req.params.id).populate("students");
+    if (!mentor) return res.status(404).json({ error: "Mentor not found" });
+
+    res.json(mentor.students);
+  } catch (err) {
+    res.status(500).json({ error: "Server error while fetching mentor's students" });
+  }
 };
